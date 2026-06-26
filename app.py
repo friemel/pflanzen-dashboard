@@ -101,7 +101,8 @@ if uploaded_file is not None:
                 st.session_state.min_lon = 12.8000
                 st.session_state.max_lon = 13.0500
                 st.rerun()
-st.sidebar.markdown("---")
+
+        st.sidebar.markdown("---")
 
         col_lat1, col_lat2 = st.sidebar.columns(2)
         with col_lat1:
@@ -114,3 +115,111 @@ st.sidebar.markdown("---")
             lon_min_input = st.number_input("Länge Min (West)", format="%.4f", key='min_lon')
         with col_lon2:
             lon_max_input = st.number_input("Länge Max (Ost)", format="%.4f", key='max_lon')
+
+        # Daten nach Region filtern
+        df_filtered = df_filtered[
+            (df_filtered['latitude'] >= lat_min_input) & 
+            (df_filtered['latitude'] <= lat_max_input) &
+            (df_filtered['longitude'] >= lon_min_input) & 
+            (df_filtered['longitude'] <= lon_max_input)
+        ]
+
+        # Buttons ganz unten in der Sidebar
+        st.sidebar.markdown("---")
+        if st.sidebar.button("🔄 Filter zurücksetzen (Alle)", use_container_width=True):
+            st.session_state.min_lat = min_lat_data
+            st.session_state.max_lat = max_lat_data
+            st.session_state.min_lon = min_lon_data
+            st.session_state.max_lon = max_lon_data
+            st.rerun()
+
+        if st.sidebar.button("❌ App beenden", use_container_width=True):
+            st.toast("Anwendung wurde gestoppt. Du kannst das Browserfenster jetzt schließen.")
+            st.stop()
+
+        # 4. Metriken anzeigen
+        col1, col2, col3 = st.columns(3)
+        col1.metric("Funde in dieser Region", len(df_filtered))
+        col2.metric("Artenvielfalt hier", df_filtered['name'].nunique())
+        col3.metric("Höchster Punkt", f"{int(df_filtered['altitude'].max())} m" if not df_filtered['altitude'].isna().all() and not df_filtered.empty else "N/A")
+
+        st.markdown("---")
+
+        # 5. Layout: Karte und Statistik
+        left_col, right_col = st.columns([2, 1])
+
+        with left_col:
+            st.subheader("📍 Fundorte in der ausgewählten Region")
+            if not df_filtered.empty:
+                fig_map = px.scatter_map(
+                    df_filtered, 
+                    lat="latitude", 
+                    lon="longitude", 
+                    hover_name="name", 
+                    hover_data=["scientific name", "altitude", "score"],
+                    zoom=9, 
+                    height=600
+                )
+                fig_map.update_layout(map_style="open-street-map")
+                fig_map.update_layout(margin={"r":0,"t":0,"l":0,"b":0})
+                st.plotly_chart(fig_map, width="stretch")
+            else:
+                st.warning("Keine Funde im ausgewählten Kartenbereich vorhanden.")
+
+        with right_col:
+            st.subheader("📊 Häufigste Arten in der Region")
+            if not df_filtered.empty:
+                top_plants = df_filtered['name'].value_counts().head(15).reset_index()
+                top_plants.columns = ['Pflanze', 'Anzahl']
+                
+                fig_chart = px.bar(
+                    top_plants, 
+                    x='Anzahl', 
+                    y='Pflanze', 
+                    orientation='h',
+                    color='Anzahl',
+                    color_continuous_scale='Greens'
+                )
+                fig_chart.update_layout(yaxis={'categoryorder':'total ascending'}, showlegend=False)
+                st.plotly_chart(fig_chart, width="stretch")
+            else:
+                st.info("Wähle einen größeren Bereich, um Statistiken zu sehen.")
+
+        # 6. Tabellarische Übersicht & GPX-Export
+        st.markdown("---")
+        
+        # Anordnung von Überschrift und Download-Button nebeneinander
+        col_header, col_download = st.columns([3, 1])
+        with col_header:
+            st.subheader("📋 Fundliste der Region (Detailansicht)")
+        
+        with col_download:
+            if not df_filtered.empty:
+                # GPX-Daten generieren
+                gpx_data = convert_to_gpx(df_filtered)
+                
+                # Datei-Download-Button bereitstellen
+                st.download_button(
+                    label="💾 Region als GPX herunterladen",
+                    data=gpx_data,
+                    file_name="flora_incognita_export.gpx",
+                    mime="application/gpx+xml",
+                    use_container_width=True
+                )
+
+        if not df_filtered.empty:
+            table_df = df_filtered[['date', 'name', 'scientific name', 'score', 'altitude', 'notes']].copy()
+            table_df['date'] = table_df['date'].dt.strftime('%Y-%m-%d %H:%M')
+            table_df['score'] = table_df['score'].round(1)
+            
+            table_df.columns = ['Datum', 'Deutscher Name', 'Wissenschaftlicher Name', 'Sicherheit (%)', 'Höhe (m)', 'Notizen']
+            table_df = table_df.sort_values(by='Datum', ascending=False)
+            
+            st.dataframe(table_df, width="stretch", hide_index=True)
+        else:
+            st.info("Keine Daten für die Tabelle im aktuellen Filterbereich.")
+
+    except Exception as e:
+        st.error(f"Fehler bei der Verarbeitung der Datei: {e}")
+else:
+    st.info("👋 Bitte lade deine Flora Incognita CSV-Datei in der linken Seitenleiste hoch, um das Dashboard zu starten.")
