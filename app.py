@@ -22,31 +22,6 @@ def load_data(file):
     df = df.dropna(subset=['latitude', 'longitude'])
     return df
 
-# NEU: Funktion zur Erstellung einer GPX-Datei aus den gefilterten Funden
-def convert_to_gpx(df):
-    gpx_lines = [
-        '<?xml version="1.0" encoding="UTF-8"?>',
-        '<gpx version="1.1" creator="Flora Incognita Dashboard" xmlns="http://www.topografix.com/GPX/1/1">'
-    ]
-    for _, row in df.iterrows():
-        lat = row['latitude']
-        lon = row['longitude']
-        name = str(row['name']).replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
-        sci = str(row['scientific name']).replace('&', '&amp;')
-        score = round(row['score'], 1) if pd.notna(row['score']) else 0
-        date_str = row['date'].strftime('%Y-%m-%d') if pd.notna(row['date']) else 'Unbekannt'
-        altitude_str = f" | Höhe: {int(row['altitude'])}m" if pd.notna(row['altitude']) else ""
-        
-        desc = f"Wiss. Name: {sci} | Sicherheit: {score}% | Datum: {date_str}{altitude_str}"
-        
-        gpx_lines.append(f'  <wpt lat="{lat}" lon="{lon}">')
-        gpx_lines.append(f'    <name>{name}</name>')
-        gpx_lines.append(f'    <desc>{desc}</desc>')
-        gpx_lines.append('  </wpt>')
-        
-    gpx_lines.append('</gpx>')
-    return '\n'.join(gpx_lines)
-
 if uploaded_file is not None:
     try:
         df = load_data(uploaded_file)
@@ -67,44 +42,52 @@ if uploaded_file is not None:
         min_lat_data, max_lat_data = float(df['latitude'].min()), float(df['latitude'].max())
         min_lon_data, max_lon_data = float(df['longitude'].min()), float(df['longitude'].max())
 
-        if 'min_lat' not in st.session_state: st.session_state.min_lat = min_lat_data
-        if 'max_lat' not in st.session_state: st.session_state.max_lat = max_lat_data
-        if 'min_lon' not in st.session_state: st.session_state.min_lon = min_lon_data
-        if 'max_lon' not in st.session_state: st.session_state.max_lon = max_lon_data
+        # ABSOLUT SICHERES INITIALISIEREN: Verhindert den KeyError im Cloud-Server
+        if 'min_lat' not in st.session_state: st.session_state['min_lat'] = min_lat_data
+        if 'max_lat' not in st.session_state: st.session_state['max_lat'] = max_lat_data
+        if 'min_lon' not in st.session_state: st.session_state['min_lon'] = min_lon_data
+        if 'max_lon' not in st.session_state: st.session_state['max_lon'] = max_lon_data
 
-        # Schnellwahl-Buttons
+        # Schnellwahl-Buttons für Burghausen und Berchtesgaden
         st.sidebar.caption("Schnellwahl Region:")
         col_btn1, col_btn2 = st.sidebar.columns(2)
         
         with col_btn1:
             if st.button("📍 Burghausen"):
-                st.session_state.min_lat = 48.1200
-                st.session_state.max_lat = 48.2000
-                st.session_state.min_lon = 12.7800
-                st.session_state.max_lon = 12.8700
+                st.session_state['min_lat'] = 48.1200
+                st.session_state['max_lat'] = 48.2000
+                st.session_state['min_lon'] = 12.7800
+                st.session_state['max_lon'] = 12.8700
                 st.rerun()
                 
         with col_btn2:
             if st.button("🏔️ Berchtesgaden"):
-                st.session_state.min_lat = 47.4500
-                st.session_state.max_lat = 47.7000
-                st.session_state.min_lon = 12.8000
-                st.session_state.max_lon = 13.0500
+                st.session_state['min_lat'] = 47.4500
+                st.session_state['max_lat'] = 47.7000
+                st.session_state['min_lon'] = 12.8000
+                st.session_state['max_lon'] = 13.0500
                 st.rerun()
 
         st.sidebar.markdown("---")
 
+        # Eingabefelder im Raster mit Fallback-Werten
         col_lat1, col_lat2 = st.sidebar.columns(2)
         with col_lat1:
-            lat_min_input = st.number_input("Breite Min (Süd)", format="%.4f", key='min_lat')
+            lat_min_input = st.number_input("Breite Min (Süd)", format="%.4f", value=st.session_state['min_lat'], key='mlat_input')
         with col_lat2:
-            lat_max_input = st.number_input("Breite Max (Nord)", format="%.4f", key='max_lat')
+            lat_max_input = st.number_input("Breite Max (Nord)", format="%.4f", value=st.session_state['max_lat'], key='maxlat_input')
 
         col_lon1, col_lon2 = st.sidebar.columns(2)
         with col_lon1:
-            lon_min_input = st.number_input("Länge Min (West)", format="%.4f", key='min_lon')
+            lon_min_input = st.number_input("Länge Min (West)", format="%.4f", value=st.session_state['min_lon'], key='mlon_input')
         with col_lon2:
-            lon_max_input = st.number_input("Länge Max (Ost)", format="%.4f", key='max_lon')
+            lon_max_input = st.number_input("Länge Max (Ost)", format="%.4f", value=st.session_state['max_lon'], key='maxlon_input')
+
+        # Synchronisiere die Eingaben zurück in den Session State
+        st.session_state['min_lat'] = lat_min_input
+        st.session_state['max_lat'] = max_lat_input
+        st.session_state['min_lon'] = lon_min_input
+        st.session_state['max_lon'] = lon_max_input
 
         # Daten nach Region filtern
         df_filtered = df_filtered[
@@ -117,10 +100,10 @@ if uploaded_file is not None:
         # Buttons ganz unten in der Sidebar
         st.sidebar.markdown("---")
         if st.sidebar.button("🔄 Filter zurücksetzen (Alle)", use_container_width=True):
-            st.session_state.min_lat = min_lat_data
-            st.session_state.max_lat = max_lat_data
-            st.session_state.min_lon = min_lon_data
-            st.session_state.max_lon = max_lon_data
+            st.session_state['min_lat'] = min_lat_data
+            st.session_state['max_lat'] = max_lat_data
+            st.session_state['min_lon'] = min_lon_data
+            st.session_state['max_lon'] = max_lon_data
             st.rerun()
 
         if st.sidebar.button("❌ App beenden", use_container_width=True):
@@ -177,8 +160,6 @@ if uploaded_file is not None:
 
         # 6. Tabellarische Übersicht & GPX-Export
         st.markdown("---")
-        
-        # Anordnung von Überschrift und Download-Button nebeneinander
         col_header, col_download = st.columns([3, 1])
         with col_header:
             st.subheader("📋 Fundliste der Region (Detailansicht)")
@@ -186,9 +167,23 @@ if uploaded_file is not None:
         with col_download:
             if not df_filtered.empty:
                 # GPX-Daten generieren
-                gpx_data = convert_to_gpx(df_filtered)
+                gpx_lines = [
+                    '<?xml version="1.0" encoding="UTF-8"?>',
+                    '<gpx version="1.1" creator="Flora Incognita Dashboard" xmlns="http://www.topografix.com/GPX/1/1">'
+                ]
+                for _, row in df_filtered.iterrows():
+                    lat = row['latitude']
+                    lon = row['longitude']
+                    p_name = str(row['name']).replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+                    sci = str(row['scientific name']).replace('&', '&amp;')
+                    scr = round(row['score'], 1) if pd.notna(row['score']) else 0
+                    dt_str = row['date'].strftime('%Y-%m-%d') if pd.notna(row['date']) else 'Unbekannt'
+                    alt_str = f" | Höhe: {int(row['altitude'])}m" if pd.notna(row['altitude']) else ""
+                    desc = f"Wiss. Name: {sci} | Sicherheit: {scr}% | Datum: {dt_str}{alt_str}"
+                    gpx_lines.append(f'  <wpt lat="{lat}" lon="{lon}"><name>{p_name}</name><desc>{desc}</desc></wpt>')
+                gpx_lines.append('</gpx>')
+                gpx_data = '\n'.join(gpx_lines)
                 
-                # Datei-Download-Button für das Smartphone / Navi bereitstellen
                 st.download_button(
                     label="💾 Region als GPX herunterladen",
                     data=gpx_data,
