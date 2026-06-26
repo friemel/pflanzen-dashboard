@@ -42,11 +42,11 @@ if uploaded_file is not None:
         min_lat_data, max_lat_data = float(df['latitude'].min()), float(df['latitude'].max())
         min_lon_data, max_lon_data = float(df['longitude'].min()), float(df['longitude'].max())
 
-        # ABSOLUT SICHERES INITIALISIEREN: Verhindert den KeyError im Cloud-Server
-        if 'min_lat' not in st.session_state: st.session_state['min_lat'] = min_lat_data
-        if 'max_lat' not in st.session_state: st.session_state['max_lat'] = max_lat_data
-        if 'min_lon' not in st.session_state: st.session_state['min_lon'] = min_lon_data
-        if 'max_lon' not in st.session_state: st.session_state['max_lon'] = max_lon_data
+        # Session-States für die Koordinaten initialisieren, falls leer
+        if 'sel_min_lat' not in st.session_state: st.session_state['sel_min_lat'] = min_lat_data
+        if 'sel_max_lat' not in st.session_state: st.session_state['sel_max_lat'] = max_lat_data
+        if 'sel_min_lon' not in st.session_state: st.session_state['sel_min_lon'] = min_lon_data
+        if 'sel_max_lon' not in st.session_state: st.session_state['sel_max_lon'] = max_lat_data
 
         # Schnellwahl-Buttons für Burghausen und Berchtesgaden
         st.sidebar.caption("Schnellwahl Region:")
@@ -54,40 +54,40 @@ if uploaded_file is not None:
         
         with col_btn1:
             if st.button("📍 Burghausen"):
-                st.session_state['min_lat'] = 48.1200
-                st.session_state['max_lat'] = 48.2000
-                st.session_state['min_lon'] = 12.7800
-                st.session_state['max_lon'] = 12.8700
+                st.session_state['sel_min_lat'] = 48.1200
+                st.session_state['sel_max_lat'] = 48.2000
+                st.session_state['sel_min_lon'] = 12.7800
+                st.session_state['sel_max_lon'] = 12.8700
                 st.rerun()
                 
         with col_btn2:
             if st.button("🏔️ Berchtesgaden"):
-                st.session_state['min_lat'] = 47.4500
-                st.session_state['max_lat'] = 47.7000
-                st.session_state['min_lon'] = 12.8000
-                st.session_state['max_lon'] = 13.0500
+                st.session_state['sel_min_lat'] = 47.4500
+                st.session_state['sel_max_lat'] = 47.7000
+                st.session_state['sel_min_lon'] = 12.8000
+                st.session_state['sel_max_lon'] = 13.0500
                 st.rerun()
 
         st.sidebar.markdown("---")
 
-        # Eingabefelder im Raster mit Fallback-Werten
+        # Eingabefelder holen sich den Standardwert aus dem sicheren 'sel_...'-Speicher
         col_lat1, col_lat2 = st.sidebar.columns(2)
         with col_lat1:
-            lat_min_input = st.number_input("Breite Min (Süd)", format="%.4f", value=st.session_state['min_lat'], key='mlat_input')
+            lat_min_input = st.number_input("Breite Min (Süd)", format="%.4f", value=st.session_state['sel_min_lat'], key='input_lat_min')
         with col_lat2:
-            lat_max_input = st.number_input("Breite Max (Nord)", format="%.4f", value=st.session_state['max_lat'], key='maxlat_input')
+            lat_max_input = st.number_input("Breite Max (Nord)", format="%.4f", value=st.session_state['sel_max_lat'], key='input_lat_max')
 
         col_lon1, col_lon2 = st.sidebar.columns(2)
         with col_lon1:
-            lon_min_input = st.number_input("Länge Min (West)", format="%.4f", value=st.session_state['min_lon'], key='mlon_input')
+            lon_min_input = st.number_input("Länge Min (West)", format="%.4f", value=st.session_state['sel_min_lon'], key='input_lon_min')
         with col_lon2:
-            lon_max_input = st.number_input("Länge Max (Ost)", format="%.4f", value=st.session_state['max_lon'], key='maxlon_input')
+            lon_max_input = st.number_input("Länge Max (Ost)", format="%.4f", value=st.session_state['sel_max_lon'], key='input_lon_max')
 
-        # Synchronisiere die Eingaben zurück in den Session State
-        st.session_state['min_lat'] = lat_min_input
-        st.session_state['max_lat'] = max_lat_input
-        st.session_state['min_lon'] = lon_min_input
-        st.session_state['max_lon'] = lon_max_input
+        # Eingetippte Werte sofort wieder im Speicher merken, falls der Nutzer tippt statt klickt
+        st.session_state['sel_min_lat'] = lat_min_input
+        st.session_state['sel_max_lat'] = lat_max_input
+        st.session_state['sel_min_lon'] = lon_min_input
+        st.session_state['sel_max_lon'] = lon_max_input
 
         # Daten nach Region filtern
         df_filtered = df_filtered[
@@ -100,10 +100,10 @@ if uploaded_file is not None:
         # Buttons ganz unten in der Sidebar
         st.sidebar.markdown("---")
         if st.sidebar.button("🔄 Filter zurücksetzen (Alle)", use_container_width=True):
-            st.session_state['min_lat'] = min_lat_data
-            st.session_state['max_lat'] = max_lat_data
-            st.session_state['min_lon'] = min_lon_data
-            st.session_state['max_lon'] = max_lon_data
+            st.session_state['sel_min_lat'] = min_lat_data
+            st.session_state['sel_max_lat'] = max_lat_data
+            st.session_state['sel_min_lon'] = min_lon_data
+            st.session_state['sel_max_lon'] = max_lon_data
             st.rerun()
 
         if st.sidebar.button("❌ App beenden", use_container_width=True):
@@ -166,7 +166,6 @@ if uploaded_file is not None:
         
         with col_download:
             if not df_filtered.empty:
-                # GPX-Daten generieren
                 gpx_lines = [
                     '<?xml version="1.0" encoding="UTF-8"?>',
                     '<gpx version="1.1" creator="Flora Incognita Dashboard" xmlns="http://www.topografix.com/GPX/1/1">'
