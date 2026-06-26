@@ -101,10 +101,16 @@ if uploaded_file is not None:
                 st.session_state.min_lon = 12.8000
                 st.session_state.max_lon = 13.0500
                 st.rerun()
-
-        st.sidebar.markdown("---")
+st.sidebar.markdown("---")
 
         col_lat1, col_lat2 = st.sidebar.columns(2)
         with col_lat1:
             lat_min_input = st.number_input("Breite Min (Süd)", format="%.4f", key='min_lat')
-        with col_lat
+        with col_lat2:
+            lat_max_input = st.number_input("Breite Max (Nord)", format="%.4f", key='max_lat')
+
+        col_lon1, col_lon2 = st.sidebar.columns(2)
+        with col_lon1:
+            lon_min_input = st.number_input("Länge Min (West)", format="%.4f", key='min_lon')
+        with col_lon2:
+            lon_max_input = st.number_input("Länge Max (Ost)", format="%.4f", key='max_lon')
